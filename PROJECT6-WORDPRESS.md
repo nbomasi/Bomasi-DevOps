@@ -31,3 +31,88 @@ sudo rsync -av /home/recovery/logs/. /var/log
 To mount in /var/www/html and /var/log
 UUID=32bddfa2-7f74-41b1-9a8f-53d0149661ce /var/www/html ext4 defaults 0 0
 UUID=0c9dad11-6753-4bae-add6-277587253002 /var/log ext4 defaults 0 0 
+
+** STEP 2: TO PREPARE DATABASE SERVER **
+Launch a second RedHat EC2 instance that will have a role – ‘DB Server’
+Repeat the same steps as for the Web Server, but instead of apps-lv create database_lv and mount it to /db directory instead of /var/www/html/.
+
+** STEP 3: Install WordPress on your Web Server EC2 **
+
+1. Update the repository
+   sudo yum -y update
+
+2. Install wget, Apache and it’s dependencies
+   sudo yum -y install wget httpd php php-mysqlnd php-fpm php-json
+
+3. Start Apache
+   sudo systemctl enable httpd
+   sudo systemctl start httpd   
+
+4. To install PHP and it’s dependencies
+    sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+    sudo yum install yum-utils http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+    sudo yum module list php
+    sudo yum module reset php
+    sudo yum module enable php:remi-7.4
+    sudo yum install php php-opcache php-gd php-curl php-mysqlnd
+    sudo systemctl start php-fpm
+    sudo systemctl enable php-fpm
+    setsebool -P httpd_execmem 1  
+
+5. Restart Apache
+    sudo systemctl restart httpd
+    mv /etc/httpd/conf.d/welcome.conf /etc/httpd/conf.d/welcome.conf_backup : To disable apache default page, so that wordpress can set in.
+
+6. Download wordpress and copy wordpress to var/www/html
+
+   mkdir wordpress
+   cd   wordpress
+   sudo wget http://wordpress.org/latest.tar.gz
+   sudo tar xzvf latest.tar.gz
+   sudo rm -rf latest.tar.gz
+   cp wordpress/wp-config-sample.php wordpress/wp-config.php
+   cp -R wordpress/. /var/www/html/ (To copy only the the content of wordpress)
+   wp-config.php was edited to enter the mysql DB user information.
+
+7. Configure SELinux Policies
+
+  sudo chown -R apache:apache /var/www/html/
+  sudo chcon -t httpd_sys_rw_content_t /var/www/html -R
+  sudo setsebool -P httpd_can_network_connect=1
+
+
+  ** STEP 4: Install MySQL on your DB Server EC2 **
+    sudo yum update
+    sudo yum install mysql-server
+    Verify that the service is up and running by using sudo systemctl status mysqld, if it is not running, restart the service and enable it so it will be running even after reboot:
+
+    sudo systemctl restart mysqld
+    sudo systemctl enable mysqld : I was unable to login back into mysql, until I had to use the following : mysql -uroot -p (https://phoenixnap.com/kb/how-to-create-new-mysql-user-account-grant-privileges)
+
+** STEP 5: Configure DB to work with WordPress **
+
+    sudo mysql (mysql -uroot -p)
+    CREATE DATABASE wordpress;
+    CREATE USER 'newuser'@'%' IDENTIFIED BY 'Eee068037';
+    GRANT ALL ON wordpress.* TO 'newuser'@'%';
+    FLUSH PRIVILEGES;
+    SHOW DATABASES;
+    exit
+ Note: For REDHAT, the mysql file is saved in /etc/my.cnf
+
+
+** STEP 6: Configure WordPress to connect to remote database. **
+   port 3306 was opened on DB server to enable remote onnection
+   sudo yum install mysql , mysql server installed on web server, because its redhat, client could not be installed seperately.
+
+   
+
+
+
+
+
+
+
+
+
+
